@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tic-Tac-Toe</title>
+  <style>
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f6f7fb;
+    }
+
+    .app {
+      width: min(360px, 92vw);
+      background: white;
+      border: 1px solid #e6e6ee;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    /* Status now has a badge + clearer styling */
+    #status {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      background: #f2f3f8;
+      border-radius: 10px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .turn-badge {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+
+    .turn-x { background: #3b82f6; } /* blue */
+    .turn-o { background: #f97316; } /* orange */
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+      transition: opacity 0.15s ease, filter 0.15s ease;
+    }
+
+    /* Board dim on game over */
+    .board.over {
+      opacity: 0.75;
+      filter: grayscale(0.2);
+    }
+
+    .cell {
+      aspect-ratio: 1 / 1;
+      font-size: 42px;
+      font-weight: 700;
+      border: 2px solid #d8dbe8;
+      border-radius: 12px;
+      background: #fff;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      user-select: none;
+      transition: transform 0.08s ease, background 0.15s ease, box-shadow 0.15s ease;
+      position: relative;
+    }
+
+    .cell:hover {
+      background: #fafbff;
+    }
+
+    .cell:disabled {
+      cursor: not-allowed;
+      opacity: 0.95;
+    }
+
+    /* Color-code marks */
+    .cell.x { color: #3b82f6; }
+    .cell.o { color: #f97316; }
+
+    /* Animate placement */
+    .cell.placed {
+      transform: scale(1.06);
+    }
+
+    /* Hover preview for next move */
+    .cell.preview-x::after,
+    .cell.preview-o::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: 42px;
+      font-weight: 700;
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    .cell.preview-x::after { content: "X"; }
+    .cell.preview-o::after { content: "O"; }
+
+    /* Highlight winning cells */
+    .cell.win {
+      border-color: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    button {
+      padding: 10px 12px;
+      border: 1px solid #d8dbe8;
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #f7f8ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Tic-Tac-Toe</h1>
+
+    <!-- Status now includes a turn badge -->
+    <p id="status">
+      <span id="turnBadge" class="turn-badge turn-x"></span>
+      <span id="statusText">Player X’s turn</span>
+    </p>
+
+    <div class="board" id="board" aria-label="Tic Tac Toe Board">
+      <button class="cell" data-index="0" aria-label="Cell 1"></button>
+      <button class="cell" data-index="1" aria-label="Cell 2"></button>
+      <button class="cell" data-index="2" aria-label="Cell 3"></button>
+      <button class="cell" data-index="3" aria-label="Cell 4"></button>
+      <button class="cell" data-index="4" aria-label="Cell 5"></button>
+      <button class="cell" data-index="5" aria-label="Cell 6"></button>
+      <button class="cell" data-index="6" aria-label="Cell 7"></button>
+      <button class="cell" data-index="7" aria-label="Cell 8"></button>
+      <button class="cell" data-index="8" aria-label="Cell 9"></button>
+    </div>
+
+    <div class="actions">
+      <button id="restartBtn">Restart</button>
+      <span style="font-size:12px; color:#666;">Two players, same device</span>
+    </div>
+  </div>
+
+  <script>
+    // --- Game state ---
+    const cells = Array.from(document.querySelectorAll(".cell"));
+    const boardEl = document.getElementById("board");
+    const statusText = document.getElementById("statusText");
+    const turnBadge = document.getElementById("turnBadge");
+    const restartBtn = document.getElementById("restartBtn");
+
+    let board = Array(9).fill(null); // each cell: "X", "O", or null
+    let currentPlayer = "X";
+    let gameOver = false;
+
+    // All winning line combinations (by cell index)
+    const winLines = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
+      [0, 4, 8], [2, 4, 6]             // diagonals
+    ];
+
+    // --- Helpers ---
+    function updateTurnUI() {
+      // Update text
+      statusText.textContent = `Player ${currentPlayer}’s turn`;
+
+      // Update badge color
+      turnBadge.classList.toggle("turn-x", currentPlayer === "X");
+      turnBadge.classList.toggle("turn-o", currentPlayer === "O");
+    }
+
+    function setStatus(message) {
+      statusText.textContent = message;
+    }
+
+    function clearPreviews() {
+      cells.forEach(c => c.classList.remove("preview-x", "preview-o"));
+    }
+
+    function checkWinner() {
+      // Returns { winner: "X"|"O", line: [a,b,c] } or null
+      for (const line of winLines) {
+        const [a, b, c] = line;
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+          return { winner: board[a], line };
+        }
+      }
+      return null;
+    }
+
+    function isDraw() {
+      return board.every(cell => cell !== null);
+    }
+
+    function endGame(message) {
+      gameOver = true;
+      setStatus(message);
+
+      // Dim board to signal game end
+      boardEl.classList.add("over");
+
+      // Disable all cells so no more moves can be made
+      cells.forEach(cell => (cell.disabled = true));
+
+      // No previews once game is over
+      clearPreviews();
+    }
+
+    function switchPlayer() {
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+      updateTurnUI();
+    }
+
+    function handleCellClick(e) {
+      if (gameOver) return;
+
+      const cell = e.currentTarget;
+      const index = Number(cell.dataset.index);
+
+      // Ignore if already filled
+      if (board[index] !== null) return;
+
+      // Place current player's mark
+      board[index] = currentPlayer;
+      cell.textContent = currentPlayer;
+      cell.disabled = true;
+
+      // Add color class (x/o) + little pop animation
+      cell.classList.add(currentPlayer === "X" ? "x" : "o");
+      cell.classList.add("placed");
+      setTimeout(() => cell.classList.remove("placed"), 120);
+
+      clearPreviews();
+
+      // Check win / draw
+      const result = checkWinner();
+      if (result) {
+        // Highlight winning line
+        result.line.forEach(i => cells[i].classList.add("win"));
+        endGame(`Player ${result.winner} wins!`);
+        return;
+      }
+
+      if (isDraw()) {
+        endGame("It’s a draw!");
+        return;
+      }
+
+      // Continue game
+      switchPlayer();
+    }
+
+    function restartGame() {
+      board = Array(9).fill(null);
+      currentPlayer = "X";
+      gameOver = false;
+
+      boardEl.classList.remove("over");
+
+      cells.forEach(cell => {
+        cell.textContent = "";
+        cell.disabled = false;
+        cell.classList.remove("x", "o", "win", "placed", "preview-x", "preview-o");
+      });
+
+      updateTurnUI();
+    }
+
+    // --- Event listeners ---
+    cells.forEach(cell => {
+      cell.addEventListener("click", handleCellClick);
+
+      // Hover preview shows the next player's mark
+      cell.addEventListener("mouseenter", () => {
+        if (!gameOver && !cell.disabled) {
+          cell.classList.add(currentPlayer === "X" ? "preview-x" : "preview-o");
+        }
+      });
+
+      cell.addEventListener("mouseleave", () => {
+        cell.classList.remove("preview-x", "preview-o");
+      });
+    });
+
+    restartBtn.addEventListener("click", restartGame);
+
+    // Initial UI setup
+    updateTurnUI();
+  </script>
+</body>
+</html>
