@@ -28,7 +28,7 @@ This project was created as a lightweight front-end exercise and is suitable for
 
 ## Live Demo (GitHub Pages)
 🔗 **Live Site:**  
-`https://<your-username>.github.io/<your-repo-name>/`
+`https://alexandralheureuxece.github.io/lab-1-akhadem2/`
 
 
 ---
